@@ -1,0 +1,8 @@
+PyQt5>=5.15
+SQLAlchemy>=1.4,<2.0
+alembic>=1.8
+reportlab>=4.0
+python-docx>=0.8
+Pillow>=9.0
+num2words>=0.5
+pytest>=7.0
