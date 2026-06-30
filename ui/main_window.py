@@ -109,44 +109,44 @@ class MainWindow(QMainWindow):
         main_layout.setSpacing(0)
 
         # ── Sidebar ──
-        sidebar = QFrame()
-        sidebar.setFixedWidth(240)
-        sidebar.setStyleSheet(f"""
+        self.sidebar = QFrame()
+        self.sidebar.setFixedWidth(240)
+        self.sidebar.setStyleSheet(f"""
             QFrame {{
                 background-color: {COLORS['sidebar_bg']};
                 border-left: 1px solid {COLORS['border']};
             }}
         """)
 
-        sidebar_layout = QVBoxLayout(sidebar)
+        sidebar_layout = QVBoxLayout(self.sidebar)
         sidebar_layout.setContentsMargins(0, 0, 0, 0)
         sidebar_layout.setSpacing(0)
 
         # Sidebar header — logo + app name
-        header_widget = QWidget()
-        header_widget.setStyleSheet(f"""
+        self.header_widget = QWidget()
+        self.header_widget.setStyleSheet(f"""
             background-color: {COLORS['sidebar_bg']};
             border-bottom: 1px solid {COLORS['border']};
         """)
-        header_layout = QVBoxLayout(header_widget)
+        header_layout = QVBoxLayout(self.header_widget)
         header_layout.setContentsMargins(SPACING["md"], SPACING["lg"],
                                           SPACING["md"], SPACING["lg"])
         header_layout.setSpacing(SPACING["sm"])
         header_layout.setAlignment(Qt.AlignCenter)
 
-        app_name = QLabel("المنظومة")
-        app_name.setFont(QFont(FONTS["display"].split(",")[0], FONT_SIZES["h2"], QFont.Bold))
-        app_name.setStyleSheet(f"color: {COLORS['accent']}; background: transparent;")
-        app_name.setAlignment(Qt.AlignCenter)
-        header_layout.addWidget(app_name)
+        self.app_name = QLabel("المنظومة")
+        self.app_name.setFont(QFont(FONTS["display"].split(",")[0], FONT_SIZES["h2"], QFont.Bold))
+        self.app_name.setStyleSheet(f"color: {COLORS['accent']}; background: transparent;")
+        self.app_name.setAlignment(Qt.AlignCenter)
+        header_layout.addWidget(self.app_name)
 
-        app_desc = QLabel("نظام الإدارة المتكامل")
-        app_desc.setFont(QFont(FONTS["body"].split(",")[0], FONT_SIZES["small"]))
-        app_desc.setStyleSheet(f"color: {COLORS['text_muted']}; background: transparent;")
-        app_desc.setAlignment(Qt.AlignCenter)
-        header_layout.addWidget(app_desc)
+        self.app_desc = QLabel("نظام الإدارة المتكامل")
+        self.app_desc.setFont(QFont(FONTS["body"].split(",")[0], FONT_SIZES["small"]))
+        self.app_desc.setStyleSheet(f"color: {COLORS['text_muted']}; background: transparent;")
+        self.app_desc.setAlignment(Qt.AlignCenter)
+        header_layout.addWidget(self.app_desc)
 
-        sidebar_layout.addWidget(header_widget)
+        sidebar_layout.addWidget(self.header_widget)
 
         # Navigation buttons
         self.nav_buttons = {}
@@ -175,15 +175,27 @@ class MainWindow(QMainWindow):
 
         sidebar_layout.addStretch()
 
-        # Version info at bottom
-        version_label = QLabel("الإصدار 1.0.0")
-        version_label.setFont(QFont(FONTS["body"].split(",")[0], FONT_SIZES["tiny"]))
-        version_label.setStyleSheet(f"color: {COLORS['border']}; background: transparent;")
-        version_label.setAlignment(Qt.AlignCenter)
-        version_label.setContentsMargins(0, 0, 0, SPACING["md"])
-        sidebar_layout.addWidget(version_label)
+        # Theme switcher button
+        self.theme_btn = create_button("🌓  تبديل المظهر", BUTTON_SECONDARY)
+        self.theme_btn.setFixedHeight(36)
+        self.theme_btn.setFixedWidth(200)
+        self.theme_btn.clicked.connect(self._toggle_theme_action)
+        
+        theme_btn_layout = QHBoxLayout()
+        theme_btn_layout.setContentsMargins(0, 0, 0, SPACING["sm"])
+        theme_btn_layout.setAlignment(Qt.AlignCenter)
+        theme_btn_layout.addWidget(self.theme_btn)
+        sidebar_layout.addLayout(theme_btn_layout)
 
-        main_layout.addWidget(sidebar)
+        # Version info at bottom
+        self.version_label = QLabel("الإصدار 1.0.0")
+        self.version_label.setFont(QFont(FONTS["body"].split(",")[0], FONT_SIZES["tiny"]))
+        self.version_label.setStyleSheet(f"color: {COLORS['border']}; background: transparent;")
+        self.version_label.setAlignment(Qt.AlignCenter)
+        self.version_label.setContentsMargins(0, 0, 0, SPACING["md"])
+        sidebar_layout.addWidget(self.version_label)
+
+        main_layout.addWidget(self.sidebar)
 
         # ── Content Area (Stacked Widget) ──
         self.stack = QStackedWidget()
@@ -284,3 +296,32 @@ class MainWindow(QMainWindow):
             self.project_form.refresh_all_data()
         elif page_name == "logistics":
             self.logistics_form._refresh_all_tables()
+
+    def _toggle_theme_action(self):
+        """التبديل بين المظهر الفاتح والداكن وتحديث كامل واجهة التطبيق."""
+        from ui.styles import toggle_theme, get_global_stylesheet, COLORS
+        toggle_theme()
+
+        # Update style on application level
+        from PyQt5.QtWidgets import QApplication
+        QApplication.instance().setStyleSheet(get_global_stylesheet())
+
+        # Update styling of main window widgets manually to ensure immediate redraw
+        self.centralWidget().setStyleSheet(f"background-color: {COLORS['background']};")
+        self.sidebar.setStyleSheet(f"background-color: {COLORS['sidebar_bg']}; border-left: 1px solid {COLORS['border']};")
+        self.header_widget.setStyleSheet(f"background-color: {COLORS['sidebar_bg']}; border-bottom: 1px solid {COLORS['border']};")
+        self.app_name.setStyleSheet(f"color: {COLORS['accent']}; background: transparent;")
+        self.app_desc.setStyleSheet(f"color: {COLORS['text_muted']}; background: transparent;")
+        self.version_label.setStyleSheet(f"color: {COLORS['border']}; background: transparent;")
+        
+        # Reload sidebar buttons styling
+        for key, btn in self.nav_buttons.items():
+            btn._apply_style(btn.isChecked())
+            
+        # Re-apply self theme switcher button styling
+        self.theme_btn.setStyleSheet(self.theme_btn.styleSheet())
+
+        # Force refresh active pages
+        self.dashboard.refresh_data()
+        self.dashboard.setStyleSheet(f"background-color: {COLORS['background']};")
+

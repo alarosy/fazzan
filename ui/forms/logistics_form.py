@@ -632,7 +632,7 @@ class LogisticsForm(QWidget):
         ])
         self.consultants_table.horizontalHeader().setSectionResizeMode(QHeaderView.Stretch)
         self.consultants_table.horizontalHeader().setSectionResizeMode(7, QHeaderView.Fixed)
-        self.consultants_table.setColumnWidth(7, 120)
+        self.consultants_table.setColumnWidth(7, 160)
         self.consultants_table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.consultants_table.setEditTriggers(QAbstractItemView.NoEditTriggers)
         self.consultants_table.verticalHeader().setVisible(False)
@@ -667,6 +667,12 @@ class LogisticsForm(QWidget):
             actions_layout.setContentsMargins(4, 4, 4, 4)
             actions_layout.setSpacing(4)
 
+            profile_btn = create_button("👤", BUTTON_GHOST)
+            profile_btn.setFixedSize(36, 32)
+            profile_btn.setToolTip("عرض الملف التعريفي")
+            profile_btn.clicked.connect(lambda _, c_obj=c: self._view_consultant_profile(c_obj))
+            actions_layout.addWidget(profile_btn)
+
             edit_btn = create_button("✏️", BUTTON_GHOST)
             edit_btn.setFixedSize(36, 32)
             edit_btn.clicked.connect(lambda _, cid=c.id: self._edit_consultant(cid))
@@ -698,6 +704,12 @@ class LogisticsForm(QWidget):
         if confirm_delete(self, name):
             consultant_svc.soft_delete_consultant(consultant_id)
             self.refresh_consultants_table()
+
+    def _view_consultant_profile(self, consultant):
+        from ui.dialogs.profile_canvas_dialog import ProfileCanvasDialog
+        dialog = ProfileCanvasDialog(consultant, person_type="consultant", parent=self)
+        dialog.exec_()
+        self.refresh_consultants_table()
 
     # ── 6.2 Catering Tab Setup ──
     def _setup_catering_tab(self):

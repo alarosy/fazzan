@@ -188,6 +188,16 @@ class TraineeForm(QWidget):
         self.search_input.textChanged.connect(self._on_search)
         header.addWidget(self.search_input)
 
+        self.filter_combo = QComboBox()
+        self.filter_combo.addItems([
+            "جميع المتدربين",
+            "المتدربين في الدورة الحالية",
+            "المتدربين السابقين"
+        ])
+        self.filter_combo.setFixedWidth(200)
+        self.filter_combo.currentIndexChanged.connect(self._on_filter_changed)
+        header.addWidget(self.filter_combo)
+
         add_btn = create_button("➕  إضافة متدرب", BUTTON_PRIMARY)
         add_btn.clicked.connect(self._add_trainee)
         header.addWidget(add_btn)
@@ -249,11 +259,27 @@ class TraineeForm(QWidget):
             self.table.setRowHeight(row, 48)
 
     def _on_search(self, text: str):
-        if text.strip():
-            # Filter in-memory or query partial
-            trainees = training_svc.search_existing_trainees(text.strip())
+        self._on_filter_changed()
+
+    def _on_filter_changed(self):
+        idx = self.filter_combo.currentIndex()
+        if idx == 1:
+            trainees = training_svc.get_current_trainees()
+        elif idx == 2:
+            trainees = training_svc.get_past_trainees()
         else:
             trainees = training_svc.get_all_trainees()
+
+        # In-memory search filtering
+        query = self.search_input.text().strip().lower()
+        if query:
+            trainees = [
+                t for t in trainees
+                if query in (t.name or "").lower()
+                or query in (t.phone or "")
+                or query in (t.organization or "").lower()
+            ]
+
         self._populate_table(trainees)
 
     def _add_trainee(self):

@@ -48,7 +48,7 @@ BUTTON_GHOST = {
 BUTTON_SUCCESS = {
     "background": COLORS["success"],
     "color": COLORS["success_text"],
-    "hover_background": "#246B3A",
+    "hover_background": COLORS["success_hover"],
     "border": "none",
     "font_weight": "bold",
     "min_width": "120px",
@@ -163,6 +163,7 @@ def create_button(text: str, style: dict = None, icon: QIcon = None,
     btn.setStyleSheet(_build_stylesheet(style))
     btn.setCursor(Qt.PointingHandCursor)
     btn.setLayoutDirection(Qt.RightToLeft)
+    btn.setFocusPolicy(Qt.NoFocus)
     
     if icon:
         btn.setIcon(icon)

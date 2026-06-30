@@ -3,27 +3,73 @@ Central theme and palette constants for the application UI.
 ثوابت الألوان والأنماط المركزية للواجهة — تطابق §3.1 من CLAUDE.md.
 """
 
-# ─── Color Palette ───────────────────────────────────────────────────────────
-COLORS = {
-    "background":   "#0D1B2A",   # كحلي داكن — خلفية رئيسية
-    "card_bg":      "#2A3A4A",   # رمادي متوسط — خلفية البطاقات
-    "card_hover":   "#344C5E",   # بطاقة عند التمرير
-    "accent":       "#C9A96E",   # ذهبي خافت — العناصر البارزة
-    "accent_hover": "#D4B87A",   # ذهبي أفتح عند التمرير
-    "text_primary": "#F0EDE8",   # أبيض مكسر — النصوص الرئيسية
-    "text_muted":   "#8A9BAB",   # رمادي فاتح — النصوص الثانوية
-    "alert_bg":     "#3D1A1A",   # أحمر داكن — بطاقات التنبيه
-    "alert_hover":  "#4D2525",   # تنبيه عند التمرير
-    "success":      "#1A3D2A",   # أخضر داكن — مؤشرات إيجابية
-    "success_text": "#4ADE80",   # أخضر فاتح للنص
-    "danger":       "#8B1A1A",   # أحمر للحذف
-    "danger_hover": "#CC3333",   # أحمر عند التمرير
-    "sidebar_bg":   "#0A1628",   # خلفية الشريط الجانبي
-    "sidebar_hover":"#1B2B3D",   # شريط جانبي عند التمرير
-    "sidebar_active":"#2A3A4A",  # عنصر نشط في الشريط
-    "border":       "#3A4A5A",   # حدود خفيفة
-    "input_bg":     "#1A2A3A",   # خلفية حقول الإدخال
+# ─── Theme Palettes ──────────────────────────────────────────────────────────
+THEMES = {
+    "light": {
+        "background":   "#F4F4F6",   # رمادي فاتح مريح — خلفية رئيسية
+        "card_bg":      "#FFFFFF",   # أبيض ناصع — خلفية البطاقات
+        "card_hover":   "#EBECEF",   # بطاقة عند التمرير
+        "accent":       "#FF5E3A",   # برتقالي مرجاني (Coral) مضيء — العناصر البارزة
+        "accent_hover": "#FF7554",   # برتقالي أفتح عند التمرير
+        "text_primary": "#1C1C1E",   # داكن جداً — النصوص الرئيسية
+        "text_muted":   "#707078",   # رمادي متوسط — النصوص الثانوية
+        "alert_bg":     "#FDF2F2",   # أحمر/وردي فاتح جداً — بطاقات التنبيه
+        "alert_hover":  "#FDE8E8",   # تنبيه عند التمرير
+        "success":      "#DEF7EC",   # أخضر فاتح — مؤشرات إيجابية
+        "success_text": "#03543F",   # أخضر داكن للنص
+        "success_hover":"#C6F6D5",   # أخضر عند التمرير
+        "danger":       "#E02424",   # أحمر للحذف
+        "danger_hover": "#C81E1E",   # أحمر عند التمرير
+        "sidebar_bg":   "#FFFFFF",   # خلفية الشريط الجانبي الفاتحة
+        "sidebar_hover":"#F1F3F5",   # شريط جانبي عند التمرير
+        "sidebar_active":"#EAEBED",  # عنصر نشط في الشريط
+        "border":       "#E2E2E8",   # حدود خفيفة
+        "input_bg":     "#FFFFFF",   # خلفية حقول الإدخال البيضاء
+    },
+    "dark": {
+        "background":   "#1C1C1E",   # رمادي دافئ داكن فاخر — خلفية رئيسية
+        "card_bg":      "#28282B",   # رمادي دافئ متوسط — خلفية البطاقات
+        "card_hover":   "#333336",   # بطاقة عند التمرير
+        "accent":       "#FF5E3A",   # برتقالي مرجاني (Coral) مضيء — العناصر البارزة
+        "accent_hover": "#FF7554",   # برتقالي أفتح عند التمرير
+        "text_primary": "#FFFFFF",   # أبيض ناصع — النصوص الرئيسية
+        "text_muted":   "#9E9E9E",   # رمادي متوسط — النصوص الثانوية
+        "alert_bg":     "#3D1B1B",   # أحمر داكن — بطاقات التنبيه
+        "alert_hover":  "#4D2525",   # تنبيه عند التمرير
+        "success":      "#1F382B",   # أخضر داكن — مؤشرات إيجابية
+        "success_text": "#22C55E",   # أخضر زمردي للنص (مثل المؤشرات الإيجابية)
+        "success_hover":"#2E533A",   # أخضر عند التمرير
+        "danger":       "#EF4444",   # أحمر للحذف
+        "danger_hover": "#F87171",   # أحمر عند التمرير
+        "sidebar_bg":   "#121214",   # خلفية الشريط الجانبي الداكنة جداً للهيكلية
+        "sidebar_hover":"#1D1D20",   # شريط جانبي عند التمرير
+        "sidebar_active":"#28282B",  # عنصر نشط في الشريط (يتطابق مع البطاقات)
+        "border":       "#2E2E33",   # حدود خفيفة وأنيقة
+        "input_bg":     "#161618",   # خلفية حقول الإدخال المحفورة
+    }
 }
+
+_current_theme_name = "light"
+COLORS = dict(THEMES[_current_theme_name])
+
+def get_current_theme() -> str:
+    """الحصول على اسم المظهر الحالي."""
+    global _current_theme_name
+    return _current_theme_name
+
+def set_theme(theme_name: str):
+    """تعيين المظهر النشط وتحديث ثوابت COLORS."""
+    global _current_theme_name, COLORS
+    if theme_name in THEMES:
+        _current_theme_name = theme_name
+        COLORS.clear()
+        COLORS.update(THEMES[theme_name])
+
+def toggle_theme() -> str:
+    """التبديل بين المظهر الفاتح والداكن."""
+    new_theme = "dark" if get_current_theme() == "light" else "light"
+    set_theme(new_theme)
+    return new_theme
 
 # ─── Font Settings ───────────────────────────────────────────────────────────
 FONTS = {
@@ -53,9 +99,9 @@ SPACING = {
 }
 
 BORDER_RADIUS = {
-    "sm":  6,
-    "md":  10,
-    "lg":  16,
+    "sm":  8,
+    "md":  12,
+    "lg":  18,
 }
 
 # ─── Global Stylesheet ──────────────────────────────────────────────────────

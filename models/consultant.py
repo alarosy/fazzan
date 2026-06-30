@@ -26,6 +26,7 @@ class Consultant(Base):
     center_share = Column(Numeric(10, 2), nullable=True)      # حصة المركز المالية (داخلية)
     consultant_share = Column(Numeric(10, 2), nullable=True)  # حصة المستشار المالية (داخلية)
     payment_method = Column(Enum(PaymentMethod), nullable=True)
+    image_path = Column(String(500), nullable=True)           # مسار الصورة الشخصية للمستشار
     is_deleted = Column(Boolean, default=False)
 
     def __repr__(self):

@@ -58,7 +58,30 @@ def run_migrations():
     Execute all pending migrations in order.
     تنفيذ جميع الترحيلات المعلّقة بالترتيب التسلسلي.
     """
-    _ensure_migrations_table()
+    from sqlalchemy import inspect
+    inspector = inspect(engine)
+    tables = inspector.get_table_names()
+    
+    is_fresh_db = False
+    if "_migrations" not in tables:
+        _ensure_migrations_table()
+        # If projects table exists and has budget_spent column, it means it's a fresh database created via create_all()
+        if "projects" in tables:
+            columns = [col["name"] for col in inspector.get_columns("projects")]
+            if "budget_spent" in columns:
+                is_fresh_db = True
+                
+    if is_fresh_db:
+        pending = _discover_migrations()
+        with engine.begin() as conn:
+            for version, _ in pending:
+                conn.execute(
+                    text("INSERT OR IGNORE INTO _migrations (version) VALUES (:v)"),
+                    {"v": version}
+                )
+        print("[migrate] Fresh database detected. All migrations marked as applied.")
+        return
+
     applied = _get_applied_versions()
     pending = _discover_migrations()
     
@@ -82,3 +105,4 @@ def run_migrations():
     
     if not any(v not in applied for v, _ in pending):
         print("[migrate] Database is up to date.")
+

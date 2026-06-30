@@ -18,6 +18,7 @@ class FinancialProposal(Base):
     id = Column(Integer, primary_key=True)
     proposal_number = Column(String(50), unique=True)          # PRO-YYYY-NNNN
     client_id = Column(Integer, ForeignKey('clients.id'), nullable=True)
+    project_id = Column(Integer, ForeignKey('projects.id'), nullable=True)
     service_type = Column(Enum(ServiceType), nullable=True)
     status = Column(Enum(ProposalStatus), default=ProposalStatus.PENDING)
     approved_by = Column(String(100), nullable=True)
@@ -29,6 +30,7 @@ class FinancialProposal(Base):
     # Relationships
     line_items = relationship('ServiceLineItem', back_populates='proposal', cascade='all, delete-orphan')
     client = relationship('Client')
+    project = relationship('Project')
 
     def __repr__(self):
         return f"<FinancialProposal(id={self.id}, number='{self.proposal_number}')>"

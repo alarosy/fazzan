@@ -48,7 +48,7 @@ class DashboardCard(QFrame):
         if self.card_type == "alert":
             return COLORS["alert_hover"]
         elif self.card_type == "success":
-            return "#246B3A"
+            return COLORS["success_hover"]
         else:
             return COLORS["card_hover"]
 

@@ -134,3 +134,10 @@ class PartnerType(enum.Enum):
     """تصنيف الشريك"""
     LOCAL = "محلي"
     INTERNATIONAL = "دولي"
+
+
+class TransactionType(str, enum.Enum):
+    """نوع الحركة المالية"""
+    IN = "in"
+    OUT = "out"
+

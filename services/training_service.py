@@ -134,6 +134,62 @@ def get_all_trainees() -> List[Trainee]:
         return results
 
 
+def get_current_trainees() -> List[Trainee]:
+    """جلب جميع المتدربين المسجلين في دورات جارية حالياً."""
+    with get_session() as session:
+        # Get active course IDs (status is 'جارية')
+        active_course_ids = [c.id for c in session.query(TrainingProgram).filter(
+            TrainingProgram.status == "جارية",
+            TrainingProgram.is_deleted == False  # noqa: E712
+        ).all()]
+        
+        if not active_course_ids:
+            return []
+            
+        # Get trainees enrolled in those courses
+        trainees = session.query(Trainee).join(
+            CourseEnrollment, CourseEnrollment.trainee_id == Trainee.id
+        ).filter(
+            CourseEnrollment.course_id.in_(active_course_ids),
+            Trainee.is_deleted == False  # noqa: E712
+        ).distinct().order_by(Trainee.name).all()
+        
+        for t in trainees:
+            session.expunge(t)
+        return trainees
+
+
+def get_past_trainees() -> List[Trainee]:
+    """جلب المتدربين السابقين (الذين لديهم دورات سابقة وليس لديهم أي دورات جارية)."""
+    with get_session() as session:
+        # Get active course IDs
+        active_course_ids = [c.id for c in session.query(TrainingProgram).filter(
+            TrainingProgram.status == "جارية",
+            TrainingProgram.is_deleted == False  # noqa: E712
+        ).all()]
+        
+        active_trainee_ids = []
+        if active_course_ids:
+            active_trainee_ids = [e.trainee_id for e in session.query(CourseEnrollment).filter(
+                CourseEnrollment.course_id.in_(active_course_ids)
+            ).all()]
+            
+        # Get trainees enrolled in any course, but exclude those currently in active courses
+        query = session.query(Trainee).join(
+            CourseEnrollment, CourseEnrollment.trainee_id == Trainee.id
+        ).filter(
+            Trainee.is_deleted == False  # noqa: E712
+        )
+        
+        if active_trainee_ids:
+            query = query.filter(~Trainee.id.in_(active_trainee_ids))
+            
+        trainees = query.distinct().order_by(Trainee.name).all()
+        for t in trainees:
+            session.expunge(t)
+        return trainees
+
+
 def create_trainee(data: dict) -> Trainee:
     """
     إنشاء متدرب جديد.

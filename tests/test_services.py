@@ -189,6 +189,38 @@ class TestTrainingService:
         assert len(results) >= 1
 
 
+    def test_trainee_status_filtering(self):
+        from services import training_service
+        
+        # Create courses
+        c1 = training_service.create_program({"name": "دورة جارية حالياً", "status": "جارية"})
+        c2 = training_service.create_program({"name": "دورة مكتملة سابقة", "status": "مكتملة"})
+        
+        # Create trainees
+        t1 = training_service.create_trainee({"name": "متدرب حالي"})
+        t2 = training_service.create_trainee({"name": "متدرب سابق"})
+        t3 = training_service.create_trainee({"name": "متدرب غير مسجل"})
+        
+        # Enroll t1 in active c1
+        training_service.enroll_trainee(c1.id, t1.id, None, {"enrollment_status": "نهائي"})
+        # Enroll t2 in completed c2
+        training_service.enroll_trainee(c2.id, t2.id, None, {"enrollment_status": "نهائي"})
+        
+        # Fetch current trainees
+        current = training_service.get_current_trainees()
+        current_ids = [t.id for t in current]
+        assert t1.id in current_ids
+        assert t2.id not in current_ids
+        assert t3.id not in current_ids
+        
+        # Fetch past trainees
+        past = training_service.get_past_trainees()
+        past_ids = [t.id for t in past]
+        assert t2.id in past_ids
+        assert t1.id not in past_ids
+        assert t3.id not in past_ids
+
+
 class TestFinanceService:
 
     def test_cash_balance_stub(self):
@@ -205,3 +237,145 @@ class TestFinanceService:
         from services import finance_service
         count = finance_service.count_pending_proposals()
         assert count == 0
+
+    def test_voucher_deletion_and_balance_recalculation(self):
+        from services import finance_service
+        from models.enums import VoucherType, PaymentMethod, RegisterType
+        from core.database import get_session
+        from models.cash_register import CashRegister
+
+        # Create Receipt Voucher 1 (CASH)
+        v1 = finance_service.create_voucher({
+            "voucher_type": VoucherType.RECEIPT,
+            "party_name": "الطرف الأول",
+            "amount": Decimal("1000.00"),
+            "payment_method": PaymentMethod.CASH
+        })
+        # Create Receipt Voucher 2 (CASH)
+        v2 = finance_service.create_voucher({
+            "voucher_type": VoucherType.RECEIPT,
+            "party_name": "الطرف الثاني",
+            "amount": Decimal("500.00"),
+            "payment_method": PaymentMethod.CASH
+        })
+        # Create Receipt Voucher 3 (CASH)
+        v3 = finance_service.create_voucher({
+            "voucher_type": VoucherType.RECEIPT,
+            "party_name": "الطرف الثالث",
+            "amount": Decimal("300.00"),
+            "payment_method": PaymentMethod.CASH
+        })
+
+        assert finance_service.get_cash_balance() == Decimal("1800.00")
+
+        # Delete the middle voucher (v2)
+        finance_service.delete_voucher(v2.id)
+
+        # Cash balance should be recalculated to 1300 (v1 + v3)
+        assert finance_service.get_cash_balance() == Decimal("1300.00")
+
+        # Verify running balance (balance_after) in the remaining logs
+        with get_session() as session:
+            logs = session.query(CashRegister).filter(
+                CashRegister.register_type == RegisterType.CASH
+            ).order_by(CashRegister.created_at.asc(), CashRegister.id.asc()).all()
+            
+            assert len(logs) == 2
+            assert logs[0].balance_after == Decimal("1000.00")
+            assert logs[1].balance_after == Decimal("1300.00")
+
+    def test_expense_deletion_and_cascade_recalculation(self):
+        from services import finance_service
+        from models.enums import VoucherType, PaymentMethod, RegisterType
+        from core.database import get_session
+        from models.cash_register import CashRegister
+
+        # Seed register with cash
+        finance_service.create_voucher({
+            "voucher_type": VoucherType.RECEIPT,
+            "party_name": "تمويل",
+            "amount": Decimal("5000.00"),
+            "payment_method": PaymentMethod.CASH
+        })
+
+        # Create manual expense 1
+        ex1 = finance_service.create_expense({
+            "name": "صيانة أجهزة",
+            "unit_price": Decimal("1000.00"),
+            "quantity": Decimal("1"),
+            "payment_method": PaymentMethod.CASH
+        })
+        # Create manual expense 2
+        ex2 = finance_service.create_expense({
+            "name": "قرطاسية",
+            "unit_price": Decimal("500.00"),
+            "quantity": Decimal("1"),
+            "payment_method": PaymentMethod.CASH
+        })
+
+        assert finance_service.get_cash_balance() == Decimal("3500.00")
+
+        # Delete manual expense 1
+        finance_service.delete_expense(ex1.id)
+
+        # Balance should be recalculated to 4500 (5000 - 500)
+        assert finance_service.get_cash_balance() == Decimal("4500.00")
+
+        with get_session() as session:
+            # Verify the cash register log of ex1 is deleted
+            logs = session.query(CashRegister).filter(CashRegister.related_expense_id == ex1.id).all()
+            assert len(logs) == 0
+
+    def test_invoice_deletion_and_recalculation(self):
+        from services import finance_service, client_service
+        from models.enums import ClientType, ServiceType, ProposalStatus, RegisterType
+        from core.database import get_session
+        from models.cash_register import CashRegister
+
+        cl = client_service.create_client({"name": "وزارة التعليم", "client_type": ClientType.INSTITUTION})
+        prop = finance_service.create_proposal(
+            data={"client_id": cl.id, "service_type": ServiceType.TRAINING},
+            line_items=[{"service_type": ServiceType.TRAINING, "unit_description": "عقد", "quantity": 1, "unit_price": 2000, "total": 2000}]
+        )
+
+        # Approve proposal to generate Invoice and CashRegister (BANK)
+        inv = finance_service.approve_proposal(prop.id)
+        assert inv is not None
+        assert finance_service.get_bank_balance() == Decimal("2000.00")
+
+        # Delete the Invoice
+        finance_service.delete_invoice(inv.id)
+
+        # Bank balance should recalculate to 0
+        assert finance_service.get_bank_balance() == Decimal("0.00")
+
+        with get_session() as session:
+            # Check the cash log was deleted
+            logs = session.query(CashRegister).filter(CashRegister.related_invoice_id == inv.id).all()
+            assert len(logs) == 0
+            
+            # Check proposal reverted to PENDING
+            p_reverted = session.query(prop.__class__).filter_by(id=prop.id).first()
+            assert p_reverted.status == ProposalStatus.PENDING
+
+    def test_proposal_approval_updates_project_budget_spent(self):
+        from services import finance_service, client_service, project_service
+        from models.enums import ClientType, ServiceType
+
+        cl = client_service.create_client({"name": "شركة الخليج", "client_type": ClientType.INSTITUTION})
+        proj = project_service.create_project({"name": "مشروع التدريب النفطي", "budget_allocated": Decimal("10000.00")})
+        
+        prop = finance_service.create_proposal(
+            data={"client_id": cl.id, "service_type": ServiceType.TRAINING, "project_id": proj.id},
+            line_items=[{"service_type": ServiceType.TRAINING, "unit_description": "برنامج", "quantity": 1, "unit_price": 4000, "total": 4000}]
+        )
+
+        assert proj.budget_spent == Decimal("0.00")
+
+        # Approve proposal
+        finance_service.approve_proposal(prop.id)
+
+        # Project budget_spent should be updated to 4000
+        proj_updated = project_service.get_project_by_id(proj.id)
+        assert proj_updated.budget_spent == Decimal("4000.00")
+

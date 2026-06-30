@@ -204,6 +204,12 @@ class TrainerForm(QWidget):
             actions_layout.setContentsMargins(4, 4, 4, 4)
             actions_layout.setSpacing(4)
 
+            profile_btn = create_button("👤", BUTTON_GHOST)
+            profile_btn.setFixedSize(36, 32)
+            profile_btn.setToolTip("عرض الملف التعريفي")
+            profile_btn.clicked.connect(lambda _, t_obj=t: self._view_trainer_profile(t_obj))
+            actions_layout.addWidget(profile_btn)
+
             edit_btn = create_button("✏️", BUTTON_GHOST)
             edit_btn.setFixedSize(36, 32)
             edit_btn.clicked.connect(lambda _, tid=t.id: self._edit_trainer(tid))
@@ -252,3 +258,9 @@ class TrainerForm(QWidget):
         if confirm_delete(self, name):
             training_svc.soft_delete_trainer(trainer_id)
             self.refresh_table()
+
+    def _view_trainer_profile(self, trainer):
+        from ui.dialogs.profile_canvas_dialog import ProfileCanvasDialog
+        dialog = ProfileCanvasDialog(trainer, person_type="trainer", parent=self)
+        dialog.exec_()
+        self.refresh_table()

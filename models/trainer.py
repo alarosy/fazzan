@@ -20,6 +20,7 @@ class Trainer(Base):
     phone = Column(String(50), nullable=True)
     specialization = Column(String(300), nullable=True)
     bio = Column(Text, nullable=True)
+    image_path = Column(String(500), nullable=True)                  # مسار الصورة الشخصية
     is_active = Column(Boolean, default=True)
     is_deleted = Column(Boolean, default=False)
     created_at = Column(DateTime, default=func.now())

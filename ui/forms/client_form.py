@@ -299,6 +299,12 @@ class ClientForm(QWidget):
             actions_layout.setContentsMargins(4, 4, 4, 4)
             actions_layout.setSpacing(4)
 
+            profile_btn = create_button("📂", BUTTON_GHOST)
+            profile_btn.setFixedSize(36, 32)
+            profile_btn.setToolTip("عرض ملف العميل")
+            profile_btn.clicked.connect(lambda _, c_obj=cl: self._view_client_profile(c_obj))
+            actions_layout.addWidget(profile_btn)
+
             edit_btn = create_button("✏️", BUTTON_GHOST)
             edit_btn.setFixedSize(36, 32)
             edit_btn.clicked.connect(lambda _, cid=cl.id: self._edit_client(cid))
@@ -354,3 +360,8 @@ class ClientForm(QWidget):
         if confirm_delete(self, name):
             client_svc.soft_delete_client(client_id)
             self.refresh_table()
+
+    def _view_client_profile(self, client):
+        from ui.dialogs.client_profile_dialog import ClientProfileDialog
+        dialog = ClientProfileDialog(client, parent=self)
+        dialog.exec_()

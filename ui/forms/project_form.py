@@ -219,6 +219,8 @@ class ContractDialog(QDialog):
 
         self.clauses = QTextEdit()
         self.clauses.setMaximumHeight(60)
+        from models.contract import Contract
+        self.clauses.setPlainText(Contract.DEFAULT_CLAUSES)
         form.addRow("الشروط والبنود الجزائية:", self.clauses)
 
         layout.addLayout(form)

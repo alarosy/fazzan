@@ -17,8 +17,25 @@ from models.asset import Asset
 from models.cash_register import CashRegister
 from models.employee import Employee
 from models.project import Project
-from models.enums import ProposalStatus, VoucherType, PaymentMethod, RegisterType, RevenueSource
+from models.enums import ProposalStatus, VoucherType, PaymentMethod, RegisterType, RevenueSource, TransactionType
 from core.arabic_number import amount_to_arabic_words
+
+
+def recalculate_balances(session, register_type: RegisterType):
+    """إعادة احتساب الأرصدة المتراكمة (balance_after) لسجل حركات الخزينة/البنك."""
+    logs = session.query(CashRegister).filter(
+        CashRegister.register_type == register_type
+    ).order_by(CashRegister.created_at.asc(), CashRegister.id.asc()).all()
+    
+    current_balance = Decimal("0.00")
+    for log in logs:
+        if log.transaction_type in ("in", TransactionType.IN):
+            current_balance += Decimal(str(log.amount))
+        else:
+            current_balance -= Decimal(str(log.amount))
+        log.balance_after = current_balance
+    session.flush()
+
 
 
 # ─── 1. Dashboard Metrics ───────────────────────────────────────────────────
@@ -252,7 +269,7 @@ def create_voucher(data: dict) -> Voucher:
         
         # Cash register tracking
         reg_type = RegisterType.BANK if data["payment_method"] == PaymentMethod.BANK else RegisterType.CASH
-        tx_type = "in" if v_type == VoucherType.RECEIPT else "out"
+        tx_type = TransactionType.IN if v_type == VoucherType.RECEIPT else TransactionType.OUT
         
         # Calculate balance after
         latest = session.query(CashRegister).filter(
@@ -260,7 +277,7 @@ def create_voucher(data: dict) -> Voucher:
         ).order_by(CashRegister.created_at.desc(), CashRegister.id.desc()).first()
         
         prev_bal = latest.balance_after if latest else Decimal("0.00")
-        if tx_type == "in":
+        if tx_type == TransactionType.IN:
             new_bal = prev_bal + val
         else:
             new_bal = prev_bal - val
@@ -282,8 +299,6 @@ def create_voucher(data: dict) -> Voucher:
                 # Add spent budget
                 if hasattr(proj, "budget_spent") and proj.budget_spent is not None:
                     proj.budget_spent += val
-                elif hasattr(proj, "budget_actual") and proj.budget_actual is not None:
-                    proj.budget_actual += val
                 elif proj.budget is not None:
                     proj.budget = max(Decimal("0.00"), proj.budget - val)
                 
@@ -303,8 +318,8 @@ def create_voucher(data: dict) -> Voucher:
         # If Receipt linked to project, increase project actual budget
         if v_type == VoucherType.RECEIPT and data.get("project_id"):
             proj = session.query(Project).filter(Project.id == data["project_id"]).first()
-            if proj and hasattr(proj, "budget_actual"):
-                proj.budget_actual = (proj.budget_actual or 0) + val
+            if proj and hasattr(proj, "budget_spent"):
+                proj.budget_spent = (proj.budget_spent or 0) + val
 
         session.flush()
         session.refresh(voucher)
@@ -349,9 +364,10 @@ def create_expense(data: dict) -> Expense:
         
         tx = CashRegister(
             register_type=reg_type,
-            transaction_type="out",
+            transaction_type=TransactionType.OUT,
             amount=val,
             description=f"مصروف تشغيلي: {expense.name}",
+            related_expense_id=expense.id,
             balance_after=new_bal
         )
         session.add(tx)
@@ -362,8 +378,6 @@ def create_expense(data: dict) -> Expense:
             if proj:
                 if hasattr(proj, "budget_spent") and proj.budget_spent is not None:
                     proj.budget_spent += val
-                elif hasattr(proj, "budget_actual") and proj.budget_actual is not None:
-                    proj.budget_actual += val
                 elif proj.budget is not None:
                     proj.budget = max(Decimal("0.00"), proj.budget - val)
                     
@@ -462,9 +476,10 @@ def approve_proposal(proposal_id: int) -> Optional[Invoice]:
         
         tx = CashRegister(
             register_type=reg_type,
-            transaction_type="in",
+            transaction_type=TransactionType.IN,
             amount=proposal.total_value,
             description=f"إيراد اعتماد الفاتورة {invoice.invoice_number} التابعة للعرض {proposal.proposal_number}",
+            related_invoice_id=invoice.id,
             balance_after=new_bal
         )
         session.add(tx)
@@ -472,8 +487,8 @@ def approve_proposal(proposal_id: int) -> Optional[Invoice]:
         # Update project actual budget if linked
         if hasattr(proposal, "project_id") and proposal.project_id:
             proj = session.query(Project).filter(Project.id == proposal.project_id).first()
-            if proj and hasattr(proj, "budget_actual"):
-                proj.budget_actual = (proj.budget_actual or 0) + proposal.total_value
+            if proj and hasattr(proj, "budget_spent"):
+                proj.budget_spent = (proj.budget_spent or 0) + proposal.total_value
                 
         session.flush()
         session.refresh(invoice)
@@ -508,8 +523,6 @@ def charge_employee_to_project(employee_id: int, project_id: int, work_days: int
         # Deduct or increase spent
         if hasattr(project, 'budget_spent') and project.budget_spent is not None:
             project.budget_spent += charge_amount
-        elif hasattr(project, 'budget_actual') and project.budget_actual is not None:
-            project.budget_actual += charge_amount
         elif project.budget is not None:
             project.budget = max(Decimal("0.00"), project.budget - charge_amount)
             
@@ -536,9 +549,10 @@ def charge_employee_to_project(employee_id: int, project_id: int, work_days: int
         
         tx = CashRegister(
             register_type=RegisterType.CASH,
-            transaction_type="out",
+            transaction_type=TransactionType.OUT,
             amount=charge_amount,
             description=f"مصروف تحميل راتب {employee.name} على مشروع {project.name}",
+            related_expense_id=expense.id,
             balance_after=new_bal
         )
         session.add(tx)
@@ -580,12 +594,19 @@ def delete_invoice(invoice_id: int) -> bool:
                 prop.approved_by = None
                 prop.approved_at = None
                 
-        # Delete related cash log
-        session.query(CashRegister).filter(
-            CashRegister.description.like(f"%الفاتورة {inv.invoice_number}%")
-        ).delete(synchronize_session=False)
+        # Get register types of logs we're about to delete
+        logs = session.query(CashRegister).filter(CashRegister.related_invoice_id == invoice_id).all()
+        reg_types = {log.register_type for log in logs}
+        
+        # Delete related cash log using foreign key
+        session.query(CashRegister).filter(CashRegister.related_invoice_id == invoice_id).delete()
 
         session.delete(inv)
+        
+        # Recalculate balances
+        for rt in reg_types:
+            recalculate_balances(session, rt)
+            
         return True
 
 
@@ -617,8 +638,17 @@ def delete_voucher(voucher_id: int) -> bool:
             if proj and hasattr(proj, "budget_spent") and proj.budget_spent is not None:
                 proj.budget_spent = max(Decimal("0.00"), proj.budget_spent - v.amount)
                 
+        # Get register types of logs we're about to delete
+        logs = session.query(CashRegister).filter(CashRegister.related_voucher_id == voucher_id).all()
+        reg_types = {log.register_type for log in logs}
+        
         session.query(CashRegister).filter(CashRegister.related_voucher_id == voucher_id).delete()
         session.delete(v)
+        
+        # Recalculate balances
+        for rt in reg_types:
+            recalculate_balances(session, rt)
+            
         return True
 
 
@@ -650,11 +680,19 @@ def delete_expense(expense_id: int) -> bool:
             if proj and hasattr(proj, "budget_spent") and proj.budget_spent is not None:
                 proj.budget_spent = max(Decimal("0.00"), proj.budget_spent - ex.total)
                 
-        session.query(CashRegister).filter(
-            CashRegister.description == f"مصروف تشغيلي: {ex.name}"
-        ).delete(synchronize_session=False)
+        # Get register types of logs we're about to delete
+        logs = session.query(CashRegister).filter(CashRegister.related_expense_id == expense_id).all()
+        reg_types = {log.register_type for log in logs}
+        
+        # Delete related cash log using foreign key
+        session.query(CashRegister).filter(CashRegister.related_expense_id == expense_id).delete()
         
         session.delete(ex)
+        
+        # Recalculate balances
+        for rt in reg_types:
+            recalculate_balances(session, rt)
+            
         return True
 
 

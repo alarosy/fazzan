@@ -35,10 +35,13 @@ def get_project_by_id(project_id: int) -> Optional[Project]:
         Project أو None
     """
     with get_session() as session:
-        return session.query(Project).filter(
+        proj = session.query(Project).filter(
             Project.id == project_id,
             Project.is_deleted == False  # noqa: E712
         ).first()
+        if proj:
+            session.expunge(proj)
+        return proj
 
 
 def create_project(data: dict) -> Project:
